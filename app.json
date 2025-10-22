@@ -1,5 +1,6 @@
 {
 	"expo": {
+		"owner": "igiziomal",
 		"name": "crypto-dashboard-mobile",
 		"slug": "crypto-dashboard-mobile",
 		"version": "1.0.0",
