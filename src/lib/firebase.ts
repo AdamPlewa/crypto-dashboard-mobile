@@ -1,7 +1,7 @@
 // src/lib/firebase.ts
 import Constants from 'expo-constants'
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { browserLocalPersistence, getAuth, setPersistence } from 'firebase/auth'
 
 console.log('[FB] firebase.ts loaded')
 
@@ -23,3 +23,7 @@ console.log('[FB] initialized:', {
 
 // ✅ Pobieramy auth (Firebase Auth SDK)
 export const auth = getAuth(app)
+
+setPersistence(auth, browserLocalPersistence)
+	.then(() => console.log('[FB] Auth persistence: local'))
+	.catch(e => console.warn('[FB] setPersistence error', e))

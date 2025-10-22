@@ -5,27 +5,24 @@ import { auth } from '../lib/firebase'
 export async function signInWithGoogleWebDirect() {
 	const provider = new GoogleAuthProvider()
 	provider.setCustomParameters({ prompt: 'select_account' })
+
 	try {
-		const cred = await signInWithPopup(auth, provider)
+		const cred = await signInWithPopup(auth, provider) // popup
 		return cred.user
-	} catch (err: any) {
-		// tylko gdy popup zablokowany: fallback do redirect
-		if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
-			await signInWithRedirect(auth, provider)
-			return null
-		}
-		// inne błędy pokaż użytkownikowi
-		throw err
+	} catch {
+		// popup zablokowany → fallback do redirect
+		await signInWithRedirect(auth, provider)
+		return null
 	}
 }
 
+// wywołaj raz po wejściu na ekran (useEffect) – domyka redirect flow
 export async function handleRedirectResult() {
 	try {
 		const res = await getRedirectResult(auth)
 		return res?.user ?? null
-	} catch (e: any) {
-		// Najczęściej: auth/no-auth-event, auth/argument-error → brak stanu, zignoruj
-		console.warn('[Google Redirect] ignored:', e?.code || e)
+	} catch (e) {
+		console.warn('[Google Redirect] error:', e)
 		return null
 	}
 }
