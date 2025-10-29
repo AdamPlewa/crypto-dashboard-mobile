@@ -1,43 +1,36 @@
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { auth } from '../lib/firebase'
+// src/context/AuthContext.tsx
+import React, { createContext, useContext, useState } from 'react'
+
+export type User = {
+  email: string
+  name?: string
+  photo?: string
+}
 
 type AuthCtx = {
-	user: User | null
-	loading: boolean
-	signOutUser: () => Promise<void>
+  user: User | null
+  setUser: (user: User | null) => void
+  signOutUser: () => void
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-	const [user, setUser] = useState<User | null>(null)
-	const [loading, setLoading] = useState(true)
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null)
 
-	useEffect(() => {
-		const unsub = onAuthStateChanged(auth, u => {
-			setUser(u ?? null)
-			setLoading(false)
-		})
-		return unsub
-	}, [])
+  const signOutUser = () => {
+    setUser(null)
+  }
 
-	const value = useMemo(
-		() => ({
-			user,
-			loading,
-			signOutUser: async () => {
-				await signOut(auth)
-			},
-		}),
-		[user, loading]
-	)
-
-	return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={{ user, setUser, signOutUser }}>
+      {children}
+    </Ctx.Provider>
+  )
 }
 
-export function useAuth() {
-	const v = useContext(Ctx)
-	if (!v) throw new Error('useAuth must be used within AuthProvider')
-	return v
+export const useAuth = () => {
+  const ctx = useContext(Ctx)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
 }
