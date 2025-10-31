@@ -1,43 +1,87 @@
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth'
+// src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { auth } from '../lib/firebase'
+import { GoogleSignin } from '@react-native-google-signin/google-signin'
+import { onAuthStateChanged, signOut as fbSignOut, type User as FirebaseUser } from 'firebase/auth'
+import { auth as firebaseAuth } from '../lib/firebase'
+
+type AppUser = {
+  provider: 'firebase' | 'google'
+  email?: string | null
+  uid?: string | null
+  name?: string | null
+  photo?: string | null
+}
 
 type AuthCtx = {
-	user: User | null
-	loading: boolean
-	signOutUser: () => Promise<void>
+  user: AppUser | null
+  loading: boolean
+  signOutUser: () => Promise<void>
+  setAppUser: (u: AppUser | null) => void
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-	const [user, setUser] = useState<User | null>(null)
-	const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<AppUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
-	useEffect(() => {
-		const unsub = onAuthStateChanged(auth, u => {
-			setUser(u ?? null)
-			setLoading(false)
-		})
-		return unsub
-	}, [])
+  useEffect(() => {
+    const unsub = onAuthStateChanged(firebaseAuth, (fbUser: FirebaseUser | null) => {
+      if (fbUser) {
+        setUser({
+          provider: 'firebase',
+          email: fbUser.email ?? null,
+          uid: fbUser.uid ?? null,
+          name: fbUser.displayName ?? null,
+          photo: fbUser.photoURL ?? null,
+        })
+      } else {
+        // jeśli poprzednio był firebase user, czyścimy; jeśli był inny provider, nie nadpisujemy
+        setUser(prev => (prev?.provider === 'firebase' ? null : prev))
+      }
+      setLoading(false)
+    })
+    return unsub
+  }, [])
 
-	const value = useMemo(
-		() => ({
-			user,
-			loading,
-			signOutUser: async () => {
-				await signOut(auth)
-			},
-		}),
-		[user, loading]
-	)
+  const setAppUser = (u: AppUser | null) => {
+    setUser(u ? { ...u } : null)
+  }
 
-	return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  const signOutUser = async () => {
+    try {
+      await fbSignOut(firebaseAuth)
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      // GoogleSignin.signOut może istnieć; jeśli nie, catch zignoruje
+      if ((GoogleSignin as any).signOut) {
+        await GoogleSignin.signOut()
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    setUser(null)
+  }
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      signOutUser,
+      setAppUser,
+    }),
+    [user, loading]
+  )
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 export function useAuth() {
-	const v = useContext(Ctx)
-	if (!v) throw new Error('useAuth must be used within AuthProvider')
-	return v
+  const v = useContext(Ctx)
+  if (!v) throw new Error('useAuth must be used within AuthProvider')
+  return v
 }
