@@ -1,26 +1,24 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
-import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser } from 'firebase/auth'
-import { auth } from '../lib/firebase'
+import { onAuthStateChanged, signOut as fbSignOut, type User as FirebaseUser } from 'firebase/auth'
+import { auth as firebaseAuth } from '../lib/firebase'
 
-export type AppUser = {
-  id?: string | null
+type AppUser = {
+  provider: 'firebase' | 'google'
   email?: string | null
+  uid?: string | null
   name?: string | null
   photo?: string | null
-  provider?: 'firebase' | 'google'
 }
 
 type AuthCtx = {
   user: AppUser | null
   loading: boolean
-  setAppUser: (u: AppUser | null) => Promise<void>
   signOutUser: () => Promise<void>
+  setAppUser: (u: AppUser | null) => void
 }
 
-const KEY = '@app_auth_user_v1'
 const Ctx = createContext<AuthCtx | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -28,86 +26,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 1) najpierw spróbuj nasłuchu firebase (email/password)
-    let unsub: (() => void) | undefined
-    try {
-      unsub = onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
-        if (fbUser) {
-          setUser({
-            id: fbUser.uid,
-            email: fbUser.email ?? null,
-            name: fbUser.displayName ?? null,
-            photo: fbUser.photoURL ?? null,
-            provider: 'firebase',
-          })
-          setLoading(false)
-          return
-        }
-        // jeśli brak firebase usera -> fallback do AsyncStorage (np. natywne Google)
-        ;(async () => {
-          try {
-            const raw = await AsyncStorage.getItem(KEY)
-            if (raw) setUser(JSON.parse(raw))
-            else setUser(null)
-          } catch {
-            setUser(null)
-          } finally {
-            setLoading(false)
-          }
-        })()
-      })
-    } catch (e) {
-      // fallback - odczyt z AsyncStorage
-      ;(async () => {
-        try {
-          const raw = await AsyncStorage.getItem(KEY)
-          if (raw) setUser(JSON.parse(raw))
-        } catch {}
-        setLoading(false)
-      })()
-    }
-
-    return () => unsub?.()
+    const unsub = onAuthStateChanged(firebaseAuth, (fbUser: FirebaseUser | null) => {
+      if (fbUser) {
+        setUser({
+          provider: 'firebase',
+          email: fbUser.email ?? null,
+          uid: fbUser.uid ?? null,
+          name: fbUser.displayName ?? null,
+          photo: fbUser.photoURL ?? null,
+        })
+      } else {
+        // jeśli poprzednio był firebase user, czyścimy; jeśli był inny provider, nie nadpisujemy
+        setUser(prev => (prev?.provider === 'firebase' ? null : prev))
+      }
+      setLoading(false)
+    })
+    return unsub
   }, [])
 
-  const setAppUser = async (u: AppUser | null) => {
-    setUser(u)
-    try {
-      if (u) await AsyncStorage.setItem(KEY, JSON.stringify(u))
-      else await AsyncStorage.removeItem(KEY)
-    } catch (err) {
-      console.warn('AuthContext: AsyncStorage error', err)
-    }
+  const setAppUser = (u: AppUser | null) => {
+    setUser(u ? { ...u } : null)
   }
 
   const signOutUser = async () => {
     try {
-      // firebase sign out (jeśli był)
-      try {
-        await firebaseSignOut(auth)
-      } catch (e) {
-        // ignore
-      }
-
-      // google sign out (natywny) - sprawdź getCurrentUser()
-      try {
-        const current = await GoogleSignin.getCurrentUser()
-        if (current) await GoogleSignin.signOut()
-      } catch (e) {
-        // ignore
-      }
-
-      try {
-        await AsyncStorage.removeItem(KEY)
-      } catch {}
-      setUser(null)
-    } catch (err) {
-      console.warn('AuthContext.signOutUser error', err)
-      setUser(null)
+      await fbSignOut(firebaseAuth)
+    } catch (e) {
+      // ignore
     }
+
+    try {
+      // GoogleSignin.signOut może istnieć; jeśli nie, catch zignoruje
+      if ((GoogleSignin as any).signOut) {
+        await GoogleSignin.signOut()
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    setUser(null)
   }
 
-  const value = useMemo(() => ({ user, loading, setAppUser, signOutUser }), [user, loading])
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      signOutUser,
+      setAppUser,
+    }),
+    [user, loading]
+  )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
