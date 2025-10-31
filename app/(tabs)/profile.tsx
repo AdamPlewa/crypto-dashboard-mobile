@@ -1,3 +1,4 @@
+// app/(tabs)/profile.tsx
 import { useColorScheme } from '@/hooks/use-color-scheme'
 import { useRouter } from 'expo-router'
 import React, { useEffect } from 'react'
@@ -10,20 +11,27 @@ export default function ProfileScreen() {
   const isDark = useColorScheme() === 'dark'
 
   useEffect(() => {
-    if (!user) router.replace('/(tabs)/login')
+    if (!user) {
+      // replace w useEffect jest bezpieczne
+      router.replace('/(tabs)/login')
+    }
   }, [user, router])
 
-  if (!user) return <Text style={{ color: isDark ? '#FFF' : '#111', textAlign: 'center', marginTop: 20 }}>Ładowanie...</Text>
+  if (!user) return <Text style={{ padding: 20 }}>Ładowanie...</Text>
 
   return (
-    <View style={{ flex: 1, padding: 20, justifyContent: 'center', gap: 12, backgroundColor: isDark ? '#0B0B0B' : '#FFF' }}>
+    <View style={{ flex: 1, padding: 20, gap: 12, justifyContent: 'center', backgroundColor: isDark ? '#0B0B0B' : '#FFF' }}>
       <Text style={{ fontSize: 26, fontWeight: '800', color: isDark ? '#FFF' : '#111' }}>Mój profil</Text>
-      <Text style={{ color: isDark ? '#B5B5B5' : '#444' }}>Email: <Text style={{ color: isDark ? '#FFF' : '#111' }}>{user.email}</Text></Text>
-      {user.name && <Text style={{ color: isDark ? '#B5B5B5' : '#444' }}>Name: <Text style={{ color: isDark ? '#FFF' : '#111' }}>{user.name}</Text></Text>}
+      <Text style={{ color: isDark ? '#B5B5B5' : '#444' }}>
+        Email: <Text style={{ color: isDark ? '#FFF' : '#111' }}>{user.email ?? '—'}</Text>
+      </Text>
+      <Text style={{ color: isDark ? '#B5B5B5' : '#444' }}>
+        UID: <Text style={{ color: isDark ? '#FFF' : '#111' }}>{user.id ?? '—'}</Text>
+      </Text>
       <Button
-        title='Wyloguj'
-        onPress={() => {
-          signOutUser()
+        title="Wyloguj"
+        onPress={async () => {
+          await signOutUser()
           router.replace('/(tabs)/login')
         }}
       />
