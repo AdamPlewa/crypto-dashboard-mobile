@@ -19,6 +19,7 @@ const MAPPING = {
 	'person.fill': 'login',
 	'chevron.left.forwardslash.chevron.right': 'code',
 	'chevron.right': 'chevron-right',
+	'star.fill': 'star',
 } as IconMapping
 
 /**
