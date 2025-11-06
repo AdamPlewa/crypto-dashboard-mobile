@@ -1,6 +1,6 @@
 // src/screens/Dashboard.js
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import CoinItem from '../components/CoinItem';
 import { fetchMarketData } from '../services/api';
 
@@ -41,6 +41,14 @@ export default function Dashboard(/* możesz zostawić props, ale nie jest już 
       </View>
     );
   }
+  if (!loading && coins.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text>Brak danych — możliwe przekroczenie limitu API. Próbuje ponownie...</Text>
+      </View>
+    );
+  }
+
 
   return (
     <View style={styles.container}>

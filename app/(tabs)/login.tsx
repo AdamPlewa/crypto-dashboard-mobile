@@ -1,20 +1,20 @@
 // app/(tabs)/login.tsx
 import { Link, useRouter } from 'expo-router'
+import React, { useEffect, useState } from 'react'
 import {
-  Platform,
   ActivityIndicator,
   Alert,
   Button,
+  Platform,
   Text,
   TextInput,
   View,
 } from 'react-native'
-import React, { useEffect, useState } from 'react'
 
 import { GoogleSignin, GoogleSigninButton, statusCodes } from '@react-native-google-signin/google-signin'
 import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth as firebaseAuth } from '../../src/lib/firebase'
 import { useAuth } from '../../src/context/AuthContext'
+import { auth as firebaseAuth } from '../../src/lib/firebase'
 
 import { Colors } from '@/constants/theme'
 import { useColorScheme } from '@/hooks/use-color-scheme'
