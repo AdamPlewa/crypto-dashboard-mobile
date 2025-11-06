@@ -49,6 +49,14 @@ export default function Coin({ route }) {
       </View>
     );
   }
+  if (!loading && !coin) {
+    return (
+      <View style={styles.center}>
+        <Text>Nie udało się załadować danych. Spróbuję ponownie później...</Text>
+      </View>
+    );
+  }
+
 
   return (
     <ScrollView style={styles.container}>

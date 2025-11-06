@@ -4,9 +4,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol'
 import { Colors } from '@/constants/theme'
 import { useColorScheme } from '@/hooks/use-color-scheme'
 import { Tabs, usePathname } from 'expo-router'
+import React from 'react'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../src/context/AuthContext'
 import { CoinsProvider } from '../../src/context/CoinsContent'
 import { WatchlistProvider } from '../../src/context/WatchlistContent'
+
 
 export default function TabLayout() {
 	const { user } = useAuth()
@@ -22,49 +25,50 @@ export default function TabLayout() {
 	return (
 		<CoinsProvider>
 			<WatchlistProvider>
-				<Tabs
-					key={isLoggedIn ? 'auth' : onRegisterScreen ? 'guest-register' : 'guest-login'}
-					screenOptions={{
-						headerShown: false,
-						tabBarActiveTintColor: tint,
-					}}>
-					{/* 1) HOME */}
-					<Tabs.Screen
-						name='index'
-						options={{
-							title: 'Home',
-							tabBarIcon: ({ color }) => <IconSymbol size={28} name='house.fill' color={color} />,
-							tabBarButton: HapticTab,
-						}}
-					/>
+				{/* SafeAreaView zabezpiecza górną część ekranu */}
+        		<SafeAreaView style={{ flex: 1 }} edges={['top']}>
+					<Tabs
+						key={isLoggedIn ? 'auth' : onRegisterScreen ? 'guest-register' : 'guest-login'}
+						screenOptions={{
+							headerShown: false,
+							tabBarActiveTintColor: tint,
+						}}>
+						{/* 1) HOME */}
+						<Tabs.Screen
+							name='index'
+							options={{
+								title: 'Home',
+								tabBarIcon: ({ color }) => <IconSymbol size={28} name='house.fill' color={color} />,
+								tabBarButton: HapticTab,
+							}}
+						/>
 
-					<Tabs.Screen name='compare' options={{ title: 'Compare', headerTitle: 'Compare Coins' }} />
+						{/* 3) WATCHLIST (nowy) */}
+						<Tabs.Screen
+							name='watchlist'
+							options={{
+								title: 'Watchlist',
+								tabBarIcon: ({ color }) => <IconSymbol size={28} name='star.fill' color={color} />,
+								tabBarButton: HapticTab,
+							}}
+						/>
 
-					{/* 3) WATCHLIST (nowy) */}
-					<Tabs.Screen
-						name='watchlist'
-						options={{
-							title: 'Watchlist',
-							tabBarIcon: ({ color }) => <IconSymbol size={28} name='star.fill' color={color} />,
-							tabBarButton: HapticTab,
-						}}
-					/>
+						{/* 4) AUTH – jeden widoczny slot */}
+						<Tabs.Screen
+							name='auth'
+							options={{
+								title: authTitle,
+								tabBarIcon: ({ color }) => <IconSymbol size={28} name={authIcon} color={color} />,
+								tabBarButton: HapticTab,
+							}}
+						/>
 
-					{/* 4) AUTH – jeden widoczny slot */}
-					<Tabs.Screen
-						name='auth'
-						options={{
-							title: authTitle,
-							tabBarIcon: ({ color }) => <IconSymbol size={28} name={authIcon} color={color} />,
-							tabBarButton: HapticTab,
-						}}
-					/>
-
-					{/* Ukryte trasy */}
-					<Tabs.Screen name='login' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-					<Tabs.Screen name='register' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-					<Tabs.Screen name='profile' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-				</Tabs>
+						{/* Ukryte trasy */}
+						<Tabs.Screen name='login' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+						<Tabs.Screen name='register' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+						<Tabs.Screen name='profile' options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+					</Tabs>
+				</SafeAreaView>
 			</WatchlistProvider>
 		</CoinsProvider>
 	)

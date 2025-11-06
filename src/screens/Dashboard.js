@@ -88,7 +88,6 @@ export default function Dashboard() {
 			/>
 		</View>
 	)
-}
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12 },

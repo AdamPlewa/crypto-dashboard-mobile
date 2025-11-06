@@ -1,92 +1,76 @@
 // src/services/fetchWithRetry.js
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEFAULT_RETRIES = 3;
-const DEFAULT_BACKOFF = 500; // ms, mnożnik
+const memoryCache = new Map();
+let globalCooldownUntil = 0; // kiedy kończy się cooldown po 429
 
-async function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
+export async function fetchWithRetry(url, options = {}) {
+  const {
+    retries = 3,
+    backoffBase = 2000,
+    cacheKey,
+    cacheTTL = 20_000,
+    axiosConfig = {},
+  } = options;
 
-/**
- * fetchWithRetry(url, options)
- * - retries: ile prób (domyślnie 3)
- * - cacheKey: jeśli podasz string, wynik zostanie zapisany w AsyncStorage jako fallback
- */
-export async function fetchWithRetry(url, { retries = DEFAULT_RETRIES, cacheKey = null, timeout = 10000 } = {}) {
-  let attempt = 0;
-  let lastError = null;
-
-  while (attempt <= retries) {
-    try {
-      const source = axios.CancelToken.source();
-      const timer = setTimeout(() => source.cancel(`timeout ${timeout}ms`), timeout);
-
-      const res = await axios.get(url, {
-        cancelToken: source.token,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'CryptoDashboard/1.0', // pomocne przy niektórych API
-        },
-      });
-
-      clearTimeout(timer);
-
-      // zapis do cache jeśli podano cacheKey
-      if (cacheKey) {
-        try {
-          await AsyncStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: res.data }));
-        } catch (e) {
-          // ignore cache write errors
-          console.warn('Cache write failed', e);
-        }
-      }
-
-      return res.data;
-    } catch (err) {
-      lastError = err;
-      attempt += 1;
-
-      // jeśli 429 — możemy zrobić dłuższe czekanie
-      const status = err?.response?.status;
-      if (status === 429) {
-        // jeśli mamy cache — zwróć cache (bez czekania) jako fallback
-        if (cacheKey) {
-          try {
-            const raw = await AsyncStorage.getItem(cacheKey);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              console.warn('Using cached result due to 429');
-              return parsed.data;
-            }
-          } catch (e) { /* ignore */ }
-        }
-        // jeżeli brak cache, rób backoff i retry
-        const delay = DEFAULT_BACKOFF * Math.pow(2, attempt); // expon. backoff
-        console.warn(`429 received — backoff ${delay}ms, attempt ${attempt}/${retries}`);
-        await sleep(delay);
-        continue;
-      }
-
-      // gdy timeout (axios cancel) lub inny błąd sieciowy -> backoff i retry
-      const delay = DEFAULT_BACKOFF * Math.pow(2, attempt);
-      console.warn(`Fetch error (attempt ${attempt}): ${err?.message || err}. Retrying in ${delay}ms`);
-      await sleep(delay);
+  // Jeśli cache ma świeże dane → zwróć natychmiast
+  if (cacheKey && memoryCache.has(cacheKey)) {
+    const entry = memoryCache.get(cacheKey);
+    if (Date.now() < entry.expiresAt) {
+      return entry.data;
+    } else {
+      memoryCache.delete(cacheKey);
     }
   }
 
-  // jeżeli wszystkie próby nieudane — spróbuj zwrócić z cache (jeśli istnieje)
-  if (cacheKey) {
-    try {
-      const raw = await AsyncStorage.getItem(cacheKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        console.warn('Returning stale cached data after retries failed');
-        return parsed.data;
-      }
-    } catch (e) { /* ignore */ }
+  // Jeśli globalny cooldown (np. po 429)
+  if (Date.now() < globalCooldownUntil) {
+    const waitMs = globalCooldownUntil - Date.now();
+    console.warn(`fetchWithRetry: global cooldown active (${waitMs}ms)`);
+    await new Promise(res => setTimeout(res, waitMs));
   }
 
-  // Jeśli nie ma cache — rzuć ostatni błąd
-  throw lastError;
-}   
+  let attempt = 0;
+  while (true) {
+    try {
+      const resp = await axios.get(url, axiosConfig);
+      const data = resp.data;
+
+      if (cacheKey) {
+        memoryCache.set(cacheKey, { data, expiresAt: Date.now() + cacheTTL });
+      }
+      return data;
+
+    } catch (err) {
+      attempt++;
+      const status = err?.response?.status;
+
+      // CoinGecko 429 → ustaw globalny cooldown
+      if (status === 429) {
+        const retryAfter = Number(err?.response?.headers?.['retry-after']) || 60;
+        const waitMs = retryAfter * 1000;
+        globalCooldownUntil = Date.now() + waitMs;
+        console.warn(`Rate limited (429). Waiting ${waitMs / 1000}s before retry`);
+        await new Promise(res => setTimeout(res, waitMs));
+        continue;
+      }
+
+      // inne 4xx → nie retry'ujemy
+      if (status && status >= 400 && status < 500) {
+        throw err;
+      }
+
+      // jeśli osiągnięto limit prób
+      if (attempt > retries) {
+        throw err;
+      }
+
+      // exponential backoff
+      const wait = backoffBase * 2 ** (attempt - 1);
+      console.warn(`fetchWithRetry: attempt ${attempt}/${retries} failed (status ${status}). Backing off ${wait}ms`);
+      await new Promise(res => setTimeout(res, wait));
+    }
+  }
+}
+
 export default fetchWithRetry;
