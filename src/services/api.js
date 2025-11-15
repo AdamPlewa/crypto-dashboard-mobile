@@ -16,9 +16,19 @@ export async function fetchCoinDetails(id) {
   return data;
 }
 
+/**
+ * Pobiera wykres rynku z CoinGecko.
+ * Dla krótkich zakresów (1,3,7 dni) nie dodajemy `interval=daily` aby dostać gęstsze dane.
+ * Dla dłuższych zakresów (>=30 dni) dodajemy `interval=daily` żeby otrzymać codzienne punkty.
+ */
 export async function fetchCoinMarketChart(id, vs_currency = 'usd', days = 7) {
-  const url = `${BASE}/coins/${id}/market_chart?vs_currency=${vs_currency}&days=${days}&interval=daily`;
-  const data = await fetchWithRetry(url, { retries: 3, cacheKey: `chart_${id}_${vs_currency}_${days}` });
-  // data.prices ...
+  if (!id) throw new Error('fetchCoinMarketChart: id is required');
+
+  // zdecydujemy, kiedy dołączać interval=daily — tylko dla dłuższych zakresów
+  // (CoinGecko automatycznie dostarczy wyższą rozdzielczość dla krótszych zakresów jeśli nie wymuszamy 'daily')
+  const intervalParam = Number(days) >= 30 ? '&interval=daily' : '';
+
+  const url = `${BASE}/coins/${id}/market_chart?vs_currency=${vs_currency}&days=${days}${intervalParam}`;
+  const data = await fetchWithRetry(url, { retries: 3, cacheKey: `chart_${id}_${vs_currency}_${days}${intervalParam}` });
   return data;
 }
