@@ -1,19 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Button } from 'react-native';
+// src/screens/Coin.js
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import SinglePriceChart from '../components/SinglePriceChart';
 import { fetchCoinDetails, fetchCoinMarketChart } from '../services/api';
-import PriceChart from '../components/PriceChart';
+
+const RANGES = [
+  { label: '1D', days: 1 },
+  { label: '3D', days: 3 },
+  { label: '7D', days: 7 },
+  { label: '1M', days: 30 },
+  { label: '90D', days: 90 },
+];
 
 export default function Coin({ route }) {
   const { id } = route.params;
   const [coin, setCoin] = useState(null);
   const [loading, setLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
-  const [chartData, setChartData] = useState([]);
+  const [prices, setPrices] = useState([]); // <-- raw prices from API: [ [ts, price], ... ]
   const [days, setDays] = useState(7);
 
   useEffect(() => {
     load();
     loadChart(days);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {
@@ -32,11 +42,12 @@ export default function Coin({ route }) {
     setChartLoading(true);
     try {
       const res = await fetchCoinMarketChart(id, 'usd', d);
-      // res.prices to tablica [ [timestamp, price], ... ]
-      setChartData(res.prices || []);
+      // res.prices is [[timestamp, price], ...]
+      setPrices(res.prices || []);
       setDays(d);
     } catch (e) {
       console.error(e);
+      setPrices([]);
     } finally {
       setChartLoading(false);
     }
@@ -57,7 +68,6 @@ export default function Coin({ route }) {
     );
   }
 
-
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.name}>{coin.name} ({coin.symbol.toUpperCase()})</Text>
@@ -66,16 +76,24 @@ export default function Coin({ route }) {
       <View style={{ height: 12 }} />
 
       <View style={styles.periodButtons}>
-        <Button title="1D" onPress={() => loadChart(1)} />
-        <Button title="7D" onPress={() => loadChart(7)} />
-        <Button title="30D" onPress={() => loadChart(30)} />
-        <Button title="90D" onPress={() => loadChart(90)} />
+        {RANGES.map(r => (
+          <TouchableOpacity
+            key={r.days}
+            onPress={() => loadChart(r.days)}
+            style={[styles.rangePill, days === r.days && styles.rangePillActive]}>
+            <Text style={[styles.rangeText, days === r.days && styles.rangeTextActive]}>{r.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {chartLoading ? (
         <View style={styles.center}><ActivityIndicator /></View>
       ) : (
-        <PriceChart data={chartData} color="#0ea5a4" />
+        // pass raw prices array that SinglePriceChart expects
+        <SinglePriceChart
+          prices={prices}
+          color="black"
+        />
       )}
 
       <View style={{height: 16}} />
@@ -92,5 +110,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   name: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 6 },
-  periodButtons: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }
+  periodButtons: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8, gap: 6 },
+  rangePill: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  rangePillActive: { backgroundColor: '#111', borderColor: '#111' },
+  rangeText: { color: '#111', fontSize: 12, fontWeight: '600' },
+  rangeTextActive: { color: '#fff' },
 });
