@@ -1,11 +1,18 @@
 // app/(tabs)/profile.tsx
 import { useColorScheme } from '@/hooks/use-color-scheme'
 import { useRouter } from 'expo-router'
+import * as Linking from 'expo-linking'
+import * as WebBrowser from 'expo-web-browser'
 import { doc, updateDoc } from 'firebase/firestore'
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Button, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useAuth } from '../../src/context/AuthContext'
 import { db } from '../../src/lib/firebase'
+
+// --- KONFIGURACJA STRIPE ---
+// Linki do Twoich produktów w Stripe (Test Mode)
+const STRIPE_LINK_MONTHLY = 'https://buy.stripe.com/test_7sYfZbe6Y1tn9Xh1815Rm00'
+const STRIPE_LINK_YEARLY = 'https://buy.stripe.com/test_28EcMZ2ogfkd3yT2c55Rm01'
 
 export default function ProfileScreen() {
   const { user, signOutUser, loading } = useAuth()
@@ -15,75 +22,44 @@ export default function ProfileScreen() {
 
   const styles = getStyles(isDark)
 
+  // Wygeneruj URL przekierowania dla Twojego środowiska (Expo Go / Build)
+  const redirectUrl = Linking.createURL('payment-success');
+
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/(tabs)/login')
     }
+    // Logujemy URL, żebyś mógł go skopiować do Stripe Dashboard
+    console.log('[STRIPE CONFIG] Twój URL przekierowania to:', redirectUrl);
   }, [user, loading, router])
 
-  // Symulacja procesu In-App Purchase
-  const handlePurchase = async (plan: 'monthly' | 'yearly') => {
-    if (!user?.uid) return
+  const handleStripePurchase = async (link) => {
+    if (link.includes('test_...') || link.endsWith('...')) {
+        Alert.alert('Konfiguracja', 'Błędny link do Stripe.');
+        return;
+    }
 
-    const label = plan === 'monthly' ? 'Miesięczny' : 'Roczny'
-    const price = plan === 'monthly' ? '24.00 PLN' : '240.00 PLN'
-
-    // 1. Systemowe okno potwierdzenia (udaje Apple/Google Pay)
-    Alert.alert(
-        'Potwierdź subskrypcję',
-        `Czy chcesz kupić plan ${label} za ${price}?`,
-        [
-            { text: 'Anuluj', style: 'cancel' },
-            { 
-                text: 'Kup', 
-                style: 'default',
-                onPress: () => processTransaction(plan) 
-            }
-        ]
-    )
+    // Informacja dla Ciebie (Developera)
+    console.log('Otwieram płatność. Pamiętaj, aby w Stripe Dashboard w "Payment Link" -> "After payment" ustawić:');
+    console.log('Redirect URL:', redirectUrl);
+    
+    try {
+        // Otwieramy przeglądarkę systemową (Chrome Custom Tabs)
+        await WebBrowser.openBrowserAsync(link);
+        // Aplikacja czeka w tle. Gdy użytkownik zapłaci i Stripe go przekieruje,
+        // system operacyjny otworzy aplikację na ekranie /payment-success.
+    } catch (e) {
+        Alert.alert('Błąd', 'Nie udało się otworzyć płatności.');
+    }
   }
 
-  const processTransaction = async (plan: 'monthly' | 'yearly') => {
-      setBuying(true)
-      
-      // 2. Symulacja przetwarzania płatności przez sklep (2 sekundy)
-      setTimeout(async () => {
-          try {
-              if (!user?.uid) return
-
-              const now = new Date()
-              let validUntil = new Date()
-
-              if (plan === 'monthly') {
-                  validUntil.setMonth(now.getMonth() + 1)
-              } else {
-                  validUntil.setFullYear(now.getFullYear() + 1)
-              }
-
-              // 3. Zapisanie uprawnień w bazie danych
-              await updateDoc(doc(db, 'users', user.uid), {
-                  isSubscribed: true,
-                  subscriptionPlan: plan,
-                  subscriptionStart: now,
-                  subscriptionValidUntil: validUntil
-              })
-
-              Alert.alert('Sukces', 'Transakcja zakończona pomyślnie. Masz teraz dostęp Premium!')
-          } catch (e) {
-              console.error(e)
-              Alert.alert('Błąd', 'Transakcja nie powiodła się. Spróbuj ponownie.')
-          } finally {
-              setBuying(false)
-          }
-      }, 2000)
-  }
-
+  // --- STARE METODY DO ANULOWANIA ---
   const handleCancelSub = async () => {
     if (!user?.uid) return
-    Alert.alert('Anulowanie', 'Czy na pewno chcesz anulować subskrypcję? Utracisz dostęp do funkcji Premium.', [
-        { text: 'Wróć', style: 'cancel' },
+    Alert.alert('Anulowanie', 'Czy na pewno chcesz anulować subskrypcję?', [
+        { text: 'Nie', style: 'cancel' },
         { 
-            text: 'Potwierdź anulowanie', 
+            text: 'Tak, anuluj', 
             style: 'destructive',
             onPress: async () => {
                 setBuying(true)
@@ -137,28 +113,23 @@ export default function ProfileScreen() {
       ) : (
         <View style={{ gap: 15 }}>
             {/* Karta Miesięczna */}
-            <TouchableOpacity 
-                style={styles.planCard} 
-                onPress={() => handlePurchase('monthly')}
-                disabled={buying}
-            >
+            <View style={styles.planCard}>
                 <View style={styles.planHeader}>
                     <Text style={styles.planTitle}>Miesięczna</Text>
                     <Text style={styles.planPrice}>24 PLN</Text>
                 </View>
-                <Text style={styles.planDesc}>Pełny dostęp na 30 dni. Płatność co miesiąc.</Text>
+                <Text style={styles.planDesc}>Pełny dostęp na 30 dni.</Text>
                 
-                <View style={styles.fakeBtn}>
-                    <Text style={styles.fakeBtnText}>{buying ? 'Przetwarzanie...' : 'Wybierz plan'}</Text>
-                </View>
-            </TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.btn, { backgroundColor: '#5b21b6' }]} 
+                    onPress={() => handleStripePurchase(STRIPE_LINK_MONTHLY)}
+                >
+                    <Text style={styles.btnText}>Kup przez Stripe</Text>
+                </TouchableOpacity>
+            </View>
 
             {/* Karta Roczna */}
-            <TouchableOpacity 
-                style={[styles.planCard, styles.planCardRecommended]} 
-                onPress={() => handlePurchase('yearly')}
-                disabled={buying}
-            >
+            <View style={[styles.planCard, styles.planCardRecommended]}>
                 <View style={styles.promoTag}>
                     <Text style={styles.promoText}>2 MIESIĄCE GRATIS</Text>
                 </View>
@@ -166,12 +137,15 @@ export default function ProfileScreen() {
                     <Text style={[styles.planTitle, { color: '#fff' }]}>Roczna</Text>
                     <Text style={[styles.planPrice, { color: '#fff' }]}>240 PLN</Text>
                 </View>
-                <Text style={[styles.planDesc, { color: '#e5e7eb' }]}>Płacisz tylko za 10 miesięcy. Dostęp na rok.</Text>
+                <Text style={[styles.planDesc, { color: '#e5e7eb' }]}>Płacisz tylko za 10 miesięcy.</Text>
                 
-                <View style={[styles.fakeBtn, { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.fakeBtnText, { color: '#2563EB' }]}>{buying ? 'Przetwarzanie...' : 'Wybierz plan'}</Text>
-                </View>
-            </TouchableOpacity>
+                <TouchableOpacity 
+                    style={[styles.btn, { backgroundColor: '#fff' }]} 
+                    onPress={() => handleStripePurchase(STRIPE_LINK_YEARLY)}
+                >
+                    <Text style={[styles.btnText, { color: '#2563EB' }]}>Kup przez Stripe</Text>
+                </TouchableOpacity>
+            </View>
         </View>
       )}
 
@@ -188,7 +162,7 @@ export default function ProfileScreen() {
   )
 }
 
-const getStyles = (isDark: boolean) => StyleSheet.create({
+const getStyles = (isDark) => StyleSheet.create({
     container: {
         padding: 20,
         backgroundColor: isDark ? '#0B0B0B' : '#F9FAFB',
@@ -257,7 +231,6 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         borderColor: isDark ? '#333' : '#E5E7EB',
         position: 'relative',
         overflow: 'hidden',
-        marginBottom: 10,
     },
     planCardRecommended: {
         backgroundColor: '#2563EB', // Blue-600
@@ -298,15 +271,21 @@ const getStyles = (isDark: boolean) => StyleSheet.create({
         fontWeight: '800',
         color: '#111',
     },
-    fakeBtn: {
-        backgroundColor: '#333',
-        paddingVertical: 10,
+    actionsRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    btn: {
+        width: '100%',
+        paddingVertical: 12,
         borderRadius: 8,
         alignItems: 'center',
-        marginTop: 10,
+        justifyContent: 'center',
+        marginTop: 10
     },
-    fakeBtnText: {
+    btnText: {
         color: '#fff',
         fontWeight: '600',
+        fontSize: 14
     }
 })
