@@ -43,7 +43,17 @@ export default function TabLayout() {
 							}}
 						/>
 
-						{/* 3) WATCHLIST (nowy) */}
+						{/* 2) COMPARE (nowy) */}
+						<Tabs.Screen
+							name='CompareScreen'
+							options={{
+								title: 'Compare',
+								tabBarIcon: ({ color }) => <IconSymbol size={28} name='arrow.triangle.2.circlepath' color={color} />,
+								tabBarButton: HapticTab,
+							}}
+						/>
+
+						{/* 3) WATCHLIST */}
 						<Tabs.Screen
 							name='watchlist'
 							options={{

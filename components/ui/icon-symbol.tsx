@@ -20,6 +20,7 @@ const MAPPING = {
 	'chevron.left.forwardslash.chevron.right': 'code',
 	'chevron.right': 'chevron-right',
 	'star.fill': 'star',
+    'arrow.triangle.2.circlepath': 'compare-arrows',
 } as IconMapping
 
 /**
