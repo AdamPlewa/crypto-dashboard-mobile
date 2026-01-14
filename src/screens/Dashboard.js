@@ -1,6 +1,6 @@
 // src/screens/Dashboard.js
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import CoinItem from '../components/CoinItem';
 import { fetchMarketData } from '../services/api';
@@ -69,7 +69,7 @@ export default function Dashboard() {
       {/* Wyszukiwarka jak w Compare */}
       <Text style={styles.header}>Markets</Text>
       <TextInput
-        placeholder="Search coin (id/symbol/name)…"
+        placeholder="Search coin"
         placeholderTextColor="#999"
         style={styles.search}
         value={query}

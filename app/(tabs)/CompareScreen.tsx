@@ -1,12 +1,12 @@
 // src/screens/CompareScreen.tsx
 import { CompareChart } from '@/src/components/CompareCharts';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, Button } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useTwoCoinsHistory } from '../../hooks/useTwoCoinsHistory';
 import CoinItem from '../../src/components/CoinItem';
-import { useCoins } from '../../src/context/CoinsContent';
 import { useAuth } from '../../src/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useCoins } from '../../src/context/CoinsContent';
 
 type Mode = 'pct' | 'nominal'
 type RangeDays = 1 | 3 | 7 | 30 | 90
@@ -112,7 +112,7 @@ export default function CompareScreen() {
       </View>
 
       <TextInput
-        placeholder='Search coin (id/symbol/name)…'
+        placeholder='Search coin'
         placeholderTextColor='#999'
         style={styles.search}
         value={query}

@@ -69,7 +69,7 @@ export default function Dashboard() {
       {/* Wyszukiwarka jak w Compare */}
       <Text style={styles.header}>Markets</Text>
       <TextInput
-        placeholder="Search coin (id/symbol/name)…"
+        placeholder="Search coin"
         placeholderTextColor="#999"
         style={styles.search}
         value={query}
