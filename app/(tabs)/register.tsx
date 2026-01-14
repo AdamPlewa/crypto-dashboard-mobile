@@ -1,12 +1,13 @@
 // app/(auth)/register.tsx
 import { Link, useRouter } from 'expo-router'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { doc, setDoc } from 'firebase/firestore'
 import React, { useState } from 'react'
 import { ActivityIndicator, Alert, Button, Platform, Text, TextInput, View } from 'react-native'
 
 import { Colors } from '@/constants/theme'
 import { useColorScheme } from '@/hooks/use-color-scheme'
-import { auth } from '../../src/lib/firebase' // z (auth) -> ../../src/lib/firebase
+import { auth, db } from '../../src/lib/firebase' // z (auth) -> ../../src/lib/firebase
 
 export default function RegisterScreen() {
 	const [email, setEmail] = useState('')
@@ -78,7 +79,16 @@ export default function RegisterScreen() {
 
 		try {
 			setBusy(true)
-			await createUserWithEmailAndPassword(auth, mail, pass)
+			const userCred = await createUserWithEmailAndPassword(auth, mail, pass)
+			
+			// Tworzymy dokument użytkownika w Firestore
+			// Domyślnie brak subskrypcji
+			await setDoc(doc(db, 'users', userCred.user.uid), {
+				email: mail,
+				createdAt: new Date(),
+				isSubscribed: false
+			})
+
 			// Po sukcesie Firebase zaloguje od razu użytkownika
 			router.replace('/(tabs)/profile') // trzymaj się grupy tabs, żeby był dolny pasek
 		} catch (e: any) {

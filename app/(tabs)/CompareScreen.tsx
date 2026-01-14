@@ -1,10 +1,12 @@
 // src/screens/CompareScreen.tsx
 import { CompareChart } from '@/src/components/CompareCharts';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions, Button } from 'react-native';
 import { useTwoCoinsHistory } from '../../hooks/useTwoCoinsHistory';
 import CoinItem from '../../src/components/CoinItem';
 import { useCoins } from '../../src/context/CoinsContent';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
 
 type Mode = 'pct' | 'nominal'
 type RangeDays = 1 | 3 | 7 | 30 | 90
@@ -20,10 +22,36 @@ const RANGES: { label: string; days: RangeDays }[] = [
 export default function CompareScreen() {
   const { width, height } = useWindowDimensions()
   const { coins, isLoading, error } = useCoins()
+  const { user } = useAuth()
+  const router = useRouter()
+  
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [mode, setMode] = useState<Mode>('pct')
   const [days, setDays] = useState<RangeDays>(7)
+
+  const isSubscribed = user?.isSubscribed
+
+  if (!isSubscribed) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.header}>Funkcja Premium</Text>
+        <Text style={{ textAlign: 'center', marginVertical: 20, fontSize: 16, color: '#444' }}>
+          Dostęp do porównywarki kryptowalut jest dostępny tylko dla subskrybentów.
+        </Text>
+        {!user ? (
+            <TouchableOpacity 
+                style={[styles.switchBtn, { backgroundColor: '#111', marginTop: 10 }]}
+                onPress={() => router.push('/(tabs)/auth')}
+            >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Zaloguj się</Text>
+            </TouchableOpacity>
+        ) : (
+             <Text style={{ color: '#666' }}>Skontaktuj się z administratorem, aby aktywować subskrypcję.</Text>
+        )}
+      </View>
+    )
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

@@ -2,7 +2,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { onAuthStateChanged, signOut as fbSignOut, type User as FirebaseUser } from 'firebase/auth'
-import { auth as firebaseAuth } from '../lib/firebase'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { auth as firebaseAuth, db } from '../lib/firebase'
 
 type AppUser = {
   provider: 'firebase' | 'google'
@@ -10,6 +11,7 @@ type AppUser = {
   uid?: string | null
   name?: string | null
   photo?: string | null
+  isSubscribed?: boolean
 }
 
 type AuthCtx = {
@@ -26,22 +28,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, (fbUser: FirebaseUser | null) => {
+    let unsubDoc: () => void = () => {}
+
+    const unsubAuth = onAuthStateChanged(firebaseAuth, (fbUser: FirebaseUser | null) => {
+      // Clean up previous doc listener if any
+      unsubDoc()
+      unsubDoc = () => {}
+
       if (fbUser) {
+        // Initial user set
         setUser({
           provider: 'firebase',
           email: fbUser.email ?? null,
           uid: fbUser.uid ?? null,
           name: fbUser.displayName ?? null,
           photo: fbUser.photoURL ?? null,
+          isSubscribed: false // default
         })
+
+        // Listen to Firestore user document for subscription status
+        // Zakładamy kolekcję 'users' i dokument o ID = uid
+        unsubDoc = onSnapshot(doc(db, 'users', fbUser.uid), (snap) => {
+          const data = snap.data()
+          const isSub = !!data?.isSubscribed
+          setUser(prev => {
+            if (!prev) return null 
+            // Only update if changed to avoid loops if we were careful, but here straightforward
+            return { ...prev, isSubscribed: isSub }
+          })
+        }, (error) => {
+             console.log("Firestore user listener error:", error)
+        })
+
       } else {
         // jeśli poprzednio był firebase user, czyścimy; jeśli był inny provider, nie nadpisujemy
+        // (W oryginalnym kodzie było: prev?.provider === 'firebase' ? null : prev)
+        // Ale skoro używamy firebaseAuth, to raczej to jest główne źródło prawdy dla firebase
         setUser(prev => (prev?.provider === 'firebase' ? null : prev))
       }
       setLoading(false)
     })
-    return unsub
+
+    return () => {
+      unsubAuth()
+      unsubDoc()
+    }
   }, [])
 
   const setAppUser = (u: AppUser | null) => {
